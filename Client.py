@@ -15,7 +15,7 @@ class Client:
 		self.R = Config.R
 		self.server_addr = Config.server
 		self.AE_key_bytes = Config.AE_key_length >> 3
-		self.RECIEVE_BUFFER = Config.client_recieve_buffer 
+		self.RECEIVE_BUFFER = Config.client_receive_buffer 
 
 	def abort(self):
 		if(getattr(self.s, '_closed') == False):
@@ -36,7 +36,7 @@ class Client:
 
 	def receive(self):
 		self.s.settimeout(None)
-		data, addr = self.s.recvfrom(self.RECIEVE_BUFFER)
+		data, addr = self.s.recvfrom(self.RECEIVE_BUFFER)
 		return eval(data.decode())
 
 	def receive2(self):
@@ -46,7 +46,7 @@ class Client:
 		flag = True
 		while flag:
 			try:
-				d, a = self.s.recvfrom(self.RECIEVE_BUFFER)
+				d, a = self.s.recvfrom(self.RECEIVE_BUFFER)
 				# self.log(d.decode())
 				data.append(eval(d.decode()))
 				addrs.append(a)
@@ -72,11 +72,11 @@ class Client:
 	def get_x_u(self):
 		return Vector(self.x_u.get_values())
 
-	def recieve_z(self):
+	def receive_z(self):
 		if(getattr(self.s, '_closed') == True):
 			return None
 
-		result = self.recieve()
+		result = self.receive()
 		self.log("the result of secure aggregation : " + result)
 
 	def setup(self):
@@ -136,7 +136,7 @@ class Client:
 	def ShareKeys(self):
 		self.log("ShareKeys --- start")  # 记录日志，表示进入 ShareKeys 函数
 
-		data = self.recieve()  # 接收数据
+		data = self.receive()  # 接收数据
 		self.check(data)  # 判断是否有≥t个用户
 
 		self.U1 = []  # 用于存储用户标识
@@ -217,7 +217,7 @@ class Client:
 
 	def ConsistencyCheck(self):
 		self.log("ConsistencyCheck --- start")
-		data = self.recieve()
+		data = self.receive()
 		self.check(data)
 		# self.U3 = data 			# a dict
 		self.U3 = data.keys()
@@ -229,7 +229,7 @@ class Client:
 
 	def Unmasking(self):
 		self.log("Unmasking --- start")
-		data = self.recieve()
+		data = self.receive()
 		for item in data:
 			# self.log(item)
 			v, sigma = item

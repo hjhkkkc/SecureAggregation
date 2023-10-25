@@ -26,5 +26,5 @@ clients = [
 ]
 server_timeout = 2
 client_timeout = 2
-client_recieve_buffer = 16 * 1024
-server_recieve_buffer = 16 * 1024
+client_receive_buffer = 16 * 1024
+server_receive_buffer = 16 * 1024

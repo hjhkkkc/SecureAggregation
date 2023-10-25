@@ -9,7 +9,7 @@ class Server:
 	def __init__(self, addr):
 		self.addr = addr
 		self.R = Config.R
-		self.RECIEVE_BUFFER = Config.server_recieve_buffer
+		self.RECEIVE_BUFFER = Config.server_receive_buffer
 
 	def abort(self):
 		if(getattr(self.s, '_closed') == False):
@@ -47,7 +47,7 @@ class Server:
 		while flag:
 			try:
 				# 使用套接字 (self.s) 接收数据和发送数据的地址 (d, a)
-				d, a = self.s.recvfrom(self.RECIEVE_BUFFER)
+				d, a = self.s.recvfrom(self.RECEIVE_BUFFER)
 				
 				# 将接收到的数据解码并将结果添加到 data 列表中
 				data.append(eval(d.decode()))
@@ -163,7 +163,7 @@ class Server:
 	def MaskedInputCollection(self):
 		self.log("MaskedInputCollection --- start")  # 记录日志，表示掩蔽输入数据收集开始
 
-		data, addrs = self.recieve()  # 接收数据和对应的地址
+		data, addrs = self.receive()  # 接收数据和对应的地址
 
 		self.check(addrs)  # 调用检查方法检查地址数据
 		self.U3 = self.collect_users(data, addrs)  # 调用 collect_users 方法，收集用户数据和地址
@@ -179,7 +179,7 @@ class Server:
 
 	def ConsistencyCheck(self):
 		self.log("ConsistencyCheck --- start")
-		data, addrs = self.recieve()
+		data, addrs = self.receive()
 		# self.log(str(data))
 		self.check(addrs)
 		self.U4 = self.collect_users(data, addrs)
@@ -188,7 +188,7 @@ class Server:
 
 	def Unmasking(self):
 		self.log("Unmasking --- start")
-		data, addrs = self.recieve()
+		data, addrs = self.receive()
 		# self.log(str(data))
 		# self.log(str(addrs))
 		self.check(addrs)
