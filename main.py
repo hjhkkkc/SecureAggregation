@@ -6,6 +6,8 @@ import multiprocessing
 from Vector import Vector
 from Client import Client
 from Server import Server
+from gmssl import *
+
 
 def task_client(ID, ip, port, x_u):
     
@@ -28,9 +30,6 @@ def task_server(ip, port, z):
     server.run()
     server.abort()
     z.append(server.get_z())
-
-
-
 
 
 def main():
@@ -80,4 +79,7 @@ def main():
 
 
 if __name__ == "__main__":
+    start_time = time.time()  # 记录开始时间
     main()
+    end_time = time.time()  # 记录结束时间
+    print("运行时间：{:.2f}秒".format(end_time - start_time))  # 计算并输出运行时间

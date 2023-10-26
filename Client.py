@@ -6,6 +6,7 @@ from Vector import Vector
 from KeyAgreement import KeyAgreement
 from SecretSharing import SecretSharing
 from DigitalSignature import DigitalSignature
+from gmssl import *
 
 class Client:
 	def __init__(self, ID, addr):
@@ -89,7 +90,6 @@ class Client:
 
 		# 接收数据，由于这个数据给出du_sk、du_pk，由setup中的Key_Distribution完成
 		data = self.receive()
-
 		# 从接收到的数据中提取出每个客户端的du_sk(Signing Key)、dv_pk(Verification Key)
 		self.d_sk, self.d_pk = data[self.ID]
 
@@ -122,8 +122,18 @@ class Client:
 		self.s_sk, self.s_pk = KeyAgreement.gen(Config.pp1024)
 
 		# 使用self.d_sk对self.c_pk和self.s_pk进行数字签名，并生成签名值（sigma）
-		sigma = DigitalSignature.sig(self.d_sk, str(self.c_pk) + str(self.s_pk))
+		# sigma = DigitalSignature.sig(self.d_sk, str(self.c_pk) + str(self.s_pk))
 
+		# 使用SM2国密算法签名，生成签名值（sigma）
+		with open(str(self.ID)+'pr.pem', 'wb') as f:
+			f.write(self.d_sk)
+		sm2pri = Sm2Key()
+		sm2pri.import_encrypted_private_key_info_pem(str(self.ID)+'pr.pem', 'password')
+		sign = Sm2Signature(sm2pri, str(self.ID), DO_SIGN)
+		sign.update(str(str(self.c_pk) + str(self.s_pk)).encode('utf-8'))	
+		sigma = sign.sign()
+		# 这里签名长度能对上，但是签名的开头字节好像不是0x30开头的？？是不是有问题？
+		# print(len(sigma))
 		# 构建一个消息（m），包括当前用户的标识（self.ID）、客户端公钥（self.c_pk）、服务器公钥（self.s_pk）和签名值（sigma）
 		m = (self.ID, self.c_pk, self.s_pk, sigma)
 
@@ -142,14 +152,35 @@ class Client:
 		self.U1 = []  # 用于存储用户标识
 		self.U_c_pk = {}
 		self.U_s_pk = {}
-
+		i = 0
 		# 遍历接收到的数据
 		for item in data:
 			u, c_u_pk, s_u_pk, sigma_u = item
+			print("用户 "+str(self.ID)+" 收到来自"+str(u)+"的数据\n")
 
-			# 使用数字签名验证数据的完整性和真实性
-			res = DigitalSignature.ver(self.U_d_pk[u], str(c_u_pk) + str(s_u_pk), sigma_u)
-			if not res:
+			# # 使用数字签名验证数据的完整性和真实性
+			# res = DigitalSignature.ver(self.U_d_pk[u], str(c_u_pk) + str(s_u_pk), sigma_u)
+			# if not res:
+			# 	self.log("ShareKeys : verification fail !!!")  # 如果验证失败，记录错误信息并中止
+			# 	self.abort()
+			# 	return
+
+			# 采用国密的验证方式
+			with open(str(u)+'_'+str(self.ID)+'_pp.pem', 'wb') as f:
+				f.write(self.U_d_pk[u])
+				# print("" + self.U_d_pk[u])
+			sm2pub = Sm2Key()
+			# print("用户"+str(self.ID)+"收到的："+str(u)+'_pp.pem'+"\n")
+			try:
+				sm2pub.import_public_key_info_pem(str(u)+'_'+str(self.ID)+'_pp.pem')
+			except Exception as e:
+				print("用户"+str(self.ID)+"收到的："+str(u)+'_pp.pem'+"出错\n")
+				self.abort()
+			ver = Sm2Signature(sm2pub, str(u), DO_VERIFY)
+			ver.update(str(str(c_u_pk) + str(s_u_pk)).encode('utf-8'))
+			verify_ret = ver.verify(sigma_u)
+			print("用户 "+ str(self.ID) +"对用户 "+str(u)+" 的验证结果为："+str(verify_ret)+"\n")
+			if not verify_ret:
 				self.log("ShareKeys : verification fail !!!")  # 如果验证失败，记录错误信息并中止
 				self.abort()
 				return
@@ -222,7 +253,16 @@ class Client:
 		# self.U3 = data 			# a dict
 		self.U3 = data.keys()
 		# self.log(str(self.U3))
-		sigma = DigitalSignature.sig(self.d_sk, str(self.U3))
+		# sigma = DigitalSignature.sig(self.d_sk, str(self.U3))
+
+		# ========采用国密的签名方式_开始=========
+		sm2pri = Sm2Key()
+		sm2pri.import_encrypted_private_key_info_pem(str(self.ID)+'pr.pem', 'password')
+		sign = Sm2Signature(sm2pri, str(self.ID), DO_SIGN)
+		sign.update(str(str(self.U3)).encode('utf-8'))	
+		sigma = sign.sign()
+		# ========采用国密的签名方式_结束=========
+
 		m = (self.ID, sigma)
 		self.send(str(m))
 		self.log("ConsistencyCheck --- finish")
@@ -233,8 +273,17 @@ class Client:
 		for item in data:
 			# self.log(item)
 			v, sigma = item
-			res = DigitalSignature.ver(self.U_d_pk[v], str(self.U3), sigma)
-			if not res:
+			# res = DigitalSignature.ver(self.U_d_pk[v], str(self.U3), sigma)
+			
+			# ===========采用国密的验证方式_开始================ 
+			sm2pub = Sm2Key()
+			sm2pub.import_public_key_info_pem(str(v)+'_sm2pub.pem')
+			ver = Sm2Signature(sm2pub, str(v), DO_VERIFY)
+			ver.update(str(self.U3).encode('utf-8'))
+			verify_ret = ver.verify(sigma)
+			# ===========采用国密的验证方式_结束================
+
+			if not verify_ret:
 				self.log("Unmasking : verification fail !!!")
 				self.abort()
 				return
