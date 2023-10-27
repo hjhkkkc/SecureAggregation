@@ -333,6 +333,7 @@ class Sm4Gcm(Structure):
 
 	def __init__(self, key, iv, aad, taglen = SM4_GCM_DEFAULT_TAG_SIZE, encrypt = True):
 		if len(key) != SM4_KEY_SIZE:
+			print("key's len =",len(key))
 			raise ValueError('Invalid key length')
 		if len(iv) < SM4_GCM_MIN_IV_SIZE or len(iv) > SM4_GCM_MAX_IV_SIZE:
 			raise ValueError('Invalid IV size')

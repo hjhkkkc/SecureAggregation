@@ -1,7 +1,7 @@
 
 
 def mod_exp(b, e, m):
-	# 计算b^e mod m的结果
+	# 计算b^e mod m 的结果，用于密钥协商
 	A = 1
 	S = b 
 	e1 = e

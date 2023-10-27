@@ -24,7 +24,7 @@ clients = [
 	[4, ("127.0.0.1", 8013)],
 	[5, ("127.0.0.1", 8014)]
 ]
-server_timeout = 1
-client_timeout = 1
-client_receive_buffer = 16 * 1024
-server_receive_buffer = 16 * 1024
+server_timeout = 0.03
+client_timeout = 0.03
+client_receive_buffer = 8 * 1024
+server_receive_buffer = 8 * 1024

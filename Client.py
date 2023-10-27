@@ -132,8 +132,6 @@ class Client:
 		sign = Sm2Signature(sm2pri, str(self.ID), DO_SIGN)
 		sign.update(str(str(self.c_pk) + str(self.s_pk)).encode('utf-8'))	
 		sigma = sign.sign()
-		# 这里签名长度能对上，但是签名的开头字节好像不是0x30开头的？？是不是有问题？
-		# print(len(sigma))
 		# 构建一个消息（m），包括当前用户的标识（self.ID）、客户端公钥（self.c_pk）、服务器公钥（self.s_pk）和签名值（sigma）
 		m = (self.ID, self.c_pk, self.s_pk, sigma)
 
@@ -156,14 +154,6 @@ class Client:
 		# 遍历接收到的数据
 		for item in data:
 			u, c_u_pk, s_u_pk, sigma_u = item
-			print("用户 "+str(self.ID)+" 收到来自"+str(u)+"的数据\n")
-
-			# # 使用数字签名验证数据的完整性和真实性
-			# res = DigitalSignature.ver(self.U_d_pk[u], str(c_u_pk) + str(s_u_pk), sigma_u)
-			# if not res:
-			# 	self.log("ShareKeys : verification fail !!!")  # 如果验证失败，记录错误信息并中止
-			# 	self.abort()
-			# 	return
 
 			# 采用国密的验证方式
 			with open(str(u)+'_'+str(self.ID)+'_pp.pem', 'wb') as f:
@@ -179,7 +169,7 @@ class Client:
 			ver = Sm2Signature(sm2pub, str(u), DO_VERIFY)
 			ver.update(str(str(c_u_pk) + str(s_u_pk)).encode('utf-8'))
 			verify_ret = ver.verify(sigma_u)
-			print("用户 "+ str(self.ID) +"对用户 "+str(u)+" 的验证结果为："+str(verify_ret)+"\n")
+			# print("用户 "+ str(self.ID) +"对用户 "+str(u)+" 的验证结果为："+str(verify_ret)+"\n")
 			if not verify_ret:
 				self.log("ShareKeys : verification fail !!!")  # 如果验证失败，记录错误信息并中止
 				self.abort()
@@ -201,10 +191,23 @@ class Client:
 				continue
 
 			k = KeyAgreement.agree(self.c_sk, self.U_c_pk[v])  # 使用密钥协商生成共享密钥 k
-			k = str(k)[:self.AE_key_bytes].encode()  # 转换共享密钥 k 为字节串
-
+			k = str(k).encode()
+			k = k[:SM4_KEY_SIZE]
 			m = (u, v, U_s_uv[i], U_b_uv[i])  # 构建消息 m，包括 u, v, U_s_uv 和 U_b_uv
-			e_uv = AE.enc(k, str(m))  # 使用加密算法 AE 对消息 m 进行加密
+			
+			# 使用加密算法 AE 对消息 m 进行加密
+			# e_uv = AE.enc(k, str(m))  
+			
+			# ====使用SM4_GCM算法进行加密解密。====
+			sm4_key = k
+			iv = k
+			aad = b'Additional Authenticated Data'
+			taglen = 16
+			sm4_gcm = Sm4Gcm(sm4_key, iv, aad, taglen, DO_ENCRYPT)
+			e_uv = sm4_gcm.update(str(m).encode())
+			e_uv += sm4_gcm.finish()
+			# ===================================
+
 			m = (u, v, e_uv)  # 更新消息 m，只包括 u, v, e_uv
 			self.send(str(m))  # 发送消息
 
@@ -255,13 +258,13 @@ class Client:
 		# self.log(str(self.U3))
 		# sigma = DigitalSignature.sig(self.d_sk, str(self.U3))
 
-		# ========采用国密的签名方式_开始=========
+		# ========采用SM2国密的签名方式_开始=========
 		sm2pri = Sm2Key()
 		sm2pri.import_encrypted_private_key_info_pem(str(self.ID)+'pr.pem', 'password')
 		sign = Sm2Signature(sm2pri, str(self.ID), DO_SIGN)
 		sign.update(str(str(self.U3)).encode('utf-8'))	
 		sigma = sign.sign()
-		# ========采用国密的签名方式_结束=========
+		# ========采用SM2国密的签名方式_结束=========
 
 		m = (self.ID, sigma)
 		self.send(str(m))
@@ -294,10 +297,23 @@ class Client:
 			if v == u:
 				continue
 			k = KeyAgreement.agree(self.c_sk, self.U_c_pk[v])
-			k = str(k)[:self.AE_key_bytes].encode()
+			k = str(k).encode()
+			k= k[:SM4_KEY_SIZE]
 			# self.log(type(AE.dec(k, self.U_e_uv[v])))
 			# self.log(len(AE.dec(k, self.U_e_uv[v])))
-			v_prime, u_prime, s_uv, b_uv = eval(AE.dec(k, self.U_e_uv[v]))
+
+			# 解密收到的e_uv
+			# v_prime, u_prime, s_uv, b_uv = eval(AE.dec(k, self.U_e_uv[v]))
+
+			# 采用国密算法进行解密与拆包
+			sm4_key = k
+			iv = k
+			aad = b'Additional Authenticated Data'
+			taglen = 16
+			sm4_gcm = Sm4Gcm(sm4_key, iv, aad, taglen, DO_DECRYPT)
+			decrypted = sm4_gcm.update(self.U_e_uv[v])
+			decrypted += sm4_gcm.finish()
+			v_prime, u_prime, s_uv, b_uv = eval(decrypted.decode())
 			if u_prime != u and v_prime != v:
 				self.log("Unmasking : unmatched user ID !!!")
 				self.abort()
